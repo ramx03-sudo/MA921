@@ -5,16 +5,16 @@ class GoldStrategy:
     """
     Gold (XAUUSD) Moving Average Crossover Strategy
     ================================================
-    ENTRY:
-      Long  -> MA9 crosses ABOVE MA21  (pure crossover, no trend filter)
-      Short -> MA9 crosses BELOW MA21  (pure crossover, no trend filter)
+    ENTRY (pure crossover + trend confirmation):
+      Long  -> MA9 crosses ABOVE MA21  AND  MA50 > MA200 (bullish trend)
+      Short -> MA9 crosses BELOW MA21  AND  MA50 < MA200 (bearish trend)
 
-    EXIT:
-      Exit Long  -> MA9 crosses BELOW MA21
-      Exit Short -> MA9 crosses ABOVE MA21
+    EXIT (whichever comes first):
+      Exit Long  -> MA9 crosses BELOW MA21   OR  MA50 crosses BELOW MA200 (Death Cross)
+      Exit Short -> MA9 crosses ABOVE MA21   OR  MA50 crosses ABOVE MA200 (Golden Cross)
 
-    MA50 and MA200 are displayed on the chart for context but do NOT
-    gate trade entries — pure MA9/MA21 crossover execution.
+    NOTE: Entry fires ONLY on the exact candle where MA9/MA21 crossover happens.
+          No continuity entries — pure crossover signals only.
     """
 
     def __init__(self):
@@ -56,46 +56,55 @@ class GoldStrategy:
         m9,   m21   = ma9.iloc[-1],   ma21.iloc[-1]
         m50,  m200  = ma50.iloc[-1],  ma200.iloc[-1]
         p9,   p21   = ma9.iloc[-2],   ma21.iloc[-2]
+        p50,  p200  = ma50.iloc[-2],  ma200.iloc[-2]
 
-        # Pure MA9/MA21 crossover detection
-        ma9_cross_up   = (p9 < p21) and (m9 > m21)   # MA9 crosses ABOVE MA21 -> BUY
-        ma9_cross_down = (p9 > p21) and (m9 < m21)   # MA9 crosses BELOW MA21 -> SELL
+        # ── Crossover detection ──────────────────────────────────────────
+        ma9_cross_up    = (p9  < p21)  and (m9  > m21)   # MA9  crosses ABOVE MA21
+        ma9_cross_down  = (p9  > p21)  and (m9  < m21)   # MA9  crosses BELOW MA21
+        ma50_cross_up   = (p50 < p200) and (m50 > m200)  # MA50 crosses ABOVE MA200 (Golden Cross)
+        ma50_cross_down = (p50 > p200) and (m50 < m200)  # MA50 crosses BELOW MA200 (Death Cross)
 
-        # MA50/MA200 for chart display only
+        # ── Trend bias (current bar) ─────────────────────────────────────
         bullish_trend = m50 > m200
         bearish_trend = m50 < m200
 
         signal = None
 
         if emit_signal:
-            # MANAGE OPEN POSITION — exits checked first
+            # ── EXIT open position first ─────────────────────────────────
             if self.position == "long":
-                if ma9_cross_down:
-                    print(f"  [STRATEGY] EXIT LONG  @ {price:.2f} | MA9 crossed below MA21")
+                # Exit Long: MA9 crosses below MA21 OR death cross
+                if ma9_cross_down or ma50_cross_down:
+                    reason = "MA9<MA21" if ma9_cross_down else "Death Cross (MA50<MA200)"
+                    print(f"  [STRATEGY] EXIT LONG  @ {price:.2f} | {reason}")
                     signal = "EXIT"
                     self.position    = None
                     self.entry_price = 0.0
 
             elif self.position == "short":
-                if ma9_cross_up:
-                    print(f"  [STRATEGY] EXIT SHORT @ {price:.2f} | MA9 crossed above MA21")
+                # Exit Short: MA9 crosses above MA21 OR golden cross
+                if ma9_cross_up or ma50_cross_up:
+                    reason = "MA9>MA21" if ma9_cross_up else "Golden Cross (MA50>MA200)"
+                    print(f"  [STRATEGY] EXIT SHORT @ {price:.2f} | {reason}")
                     signal = "EXIT"
                     self.position    = None
                     self.entry_price = 0.0
 
-            # ENTRY — only when flat, only on a fresh crossover this candle
+            # ── ENTRY — flat + fresh crossover + trend confirmation ───────
             if self.position is None and signal != "EXIT":
-                if ma9_cross_up:
+                # LONG: MA9 crosses above MA21 AND we are in a bullish trend
+                if ma9_cross_up and bullish_trend:
                     self.position    = "long"
                     self.entry_price = price
                     signal = "BUY"
-                    print(f"  [STRATEGY] ENTER LONG  @ {price:.2f} | MA9 crossed above MA21 | MA50={m50:.2f} MA200={m200:.2f}")
+                    print(f"  [STRATEGY] ENTER LONG  @ {price:.2f} | MA9 crossed above MA21 | MA50={m50:.2f} > MA200={m200:.2f}")
 
-                elif ma9_cross_down:
+                # SHORT: MA9 crosses below MA21 AND we are in a bearish trend
+                elif ma9_cross_down and bearish_trend:
                     self.position    = "short"
                     self.entry_price = price
                     signal = "SELL"
-                    print(f"  [STRATEGY] ENTER SHORT @ {price:.2f} | MA9 crossed below MA21 | MA50={m50:.2f} MA200={m200:.2f}")
+                    print(f"  [STRATEGY] ENTER SHORT @ {price:.2f} | MA9 crossed below MA21 | MA50={m50:.2f} < MA200={m200:.2f}")
 
         return {
             "signal":        signal,
