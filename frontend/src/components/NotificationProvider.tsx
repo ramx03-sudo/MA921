@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useCallback, useState, useEffect, useRef } from "react";
+import React, { createContext, useContext, useCallback, useState, useEffect } from "react";
 import { CheckCircle, XCircle, AlertTriangle, Info, X, TrendingUp, TrendingDown, Bell } from "lucide-react";
 
 export type ToastType = "success" | "error" | "warning" | "info" | "trade_buy" | "trade_sell" | "crossover";
