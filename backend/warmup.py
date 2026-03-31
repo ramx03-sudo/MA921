@@ -17,7 +17,7 @@ CACHE_MAX_AGE_SECS = 900
 CANDLE_STALE_SECS = 600  # 10 minutes
 
 FINNHUB_API_KEY = "d73p9fpr01qjjol3rhp0d73p9fpr01qjjol3rhpg"
-FINNHUB_CANDLE_URL = "https://finnhub.io/api/v1/stock/candle"
+FINNHUB_CANDLE_URL = "https://finnhub.io/api/v1/forex/candle"
 
 # yfinance interval mapping
 # yfinance intervals: 1m, 5m, 15m, 60m (1h not supported directly → use 60m)
