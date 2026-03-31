@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useWS } from "@/components/WebSocketProvider";
+import { API_URL } from "@/config";
 
 interface Trade {
   time: string;
@@ -22,7 +23,7 @@ export default function Trades() {
   // Fetch authoritative trade list from REST API on every page visit
   const fetchTrades = async () => {
     try {
-      const resp = await fetch("http://localhost:8000/api/trades");
+      const resp = await fetch(`${API_URL}/api/trades`);
       const data = await resp.json();
       if (data.trades) setRestTrades(data.trades);
     } catch (e) {

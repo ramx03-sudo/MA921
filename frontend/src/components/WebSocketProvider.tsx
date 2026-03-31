@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from "react";
 import { useNotify } from "@/components/NotificationProvider";
+import { API_URL, WS_URL } from "@/config";
 
 interface PortfolioState {
   balance: number;
@@ -95,7 +96,7 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
 
   // Fetch strategy engine status on mount
   useEffect(() => {
-    fetch("http://localhost:8000/api/status")
+    fetch(`${API_URL}/api/status`)
       .then(r => r.json())
       .then(d => setStrategyActive(!!d.engine_armed))
       .catch(() => {});
@@ -104,7 +105,7 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
   const toggleStrategy = useCallback(async () => {
     const endpoint = strategyActive ? "/api/stop" : "/api/start";
     try {
-      await fetch(`http://localhost:8000${endpoint}`, { method: "POST" });
+      await fetch(`${API_URL}${endpoint}`, { method: "POST" });
       setStrategyActive(prev => !prev);
       notify?.(
         strategyActive ? "warning" : "success",
@@ -118,7 +119,7 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
 
   const resetSimulation = useCallback(async () => {
     try {
-      await fetch("http://localhost:8000/api/reset", { method: "POST" });
+      await fetch(`${API_URL}/api/reset`, { method: "POST" });
       notify?.("info", "Simulation Reset", "Portfolio and trade history cleared.");
     } catch {
       notify?.("error", "Connection Error", "Failed to reach backend.");
@@ -132,13 +133,13 @@ export const WebSocketProvider = ({ children }: { children: React.ReactNode }) =
 
     const connect = () => {
       if (!isMounted) return;
-      ws = new WebSocket("ws://localhost:8000/ws/live");
+      ws = new WebSocket(WS_URL);
 
       ws.onopen = async () => {
         if (!isMounted) return;
         setConnected(true);
         try {
-          const resp = await fetch("http://localhost:8000/api/trades");
+          const resp = await fetch(`${API_URL}/api/trades`);
           const data = await resp.json();
           if (isMounted && data.trades) setTrades(data.trades);
         } catch {}

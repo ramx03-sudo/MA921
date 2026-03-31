@@ -6,6 +6,7 @@ import {
   createChart, ColorType, CandlestickSeries, LineSeries, createSeriesMarkers,
 } from "lightweight-charts";
 import { Search, Maximize2, ChevronDown, List, Info } from "lucide-react";
+import { API_URL } from "@/config";
 
 export default function Dashboard() {
   const { connected, priceData, portfolio, snapshot, trades } = useWS();
@@ -160,7 +161,7 @@ export default function Dashboard() {
     }
 
     try {
-      const resp = await fetch(`http://localhost:8000/api/history?interval=${tf}&outputsize=300`);
+      const resp = await fetch(`${API_URL}/api/history?interval=${tf}&outputsize=300`);
       const data = await resp.json();
       if (data.candles?.length > 0) {
         loadCandlesIntoChart(data.candles);

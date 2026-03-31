@@ -9,6 +9,7 @@ import {
   Play, TrendingUp, TrendingDown, BarChart2, Activity,
   Target, AlertTriangle, Clock, DollarSign, Percent, Award,
 } from "lucide-react";
+import { API_URL } from "@/config";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Trade {
@@ -188,7 +189,7 @@ export default function Backtest() {
     setError(null);
     setResult(null);
     try {
-      const r = await fetch("http://localhost:8000/api/backtest", {
+      const r = await fetch(`${API_URL}/api/backtest`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ period: p }),

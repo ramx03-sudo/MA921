@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { useWS } from "@/components/WebSocketProvider";
 import { useNotify } from "@/components/NotificationProvider";
+import { API_URL } from "@/config";
 
 interface EngineConfig {
   initial_capital: number;
@@ -29,7 +30,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetch("http://localhost:8000/api/status")
+    fetch(`${API_URL}/api/status`)
       .then(r => r.json())
       .then((d: any) => {
         setConfig({

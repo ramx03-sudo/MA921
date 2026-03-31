@@ -11,6 +11,7 @@ import {
   Activity, Target,
   DollarSign, Zap, Award, Shield, AlertTriangle
 } from "lucide-react";
+import { API_URL } from "@/config";
 
 export default function Analytics() {
   const { analytics: wsAnalytics, trades } = useWS();
@@ -18,7 +19,7 @@ export default function Analytics() {
 
   useEffect(() => {
     if (wsAnalytics) { setData(wsAnalytics); return; }
-    fetch("http://localhost:8000/api/analytics")
+    fetch(`${API_URL}/api/analytics`)
       .then(r => r.json()).then(setData).catch(console.error);
   }, [wsAnalytics]);
 
