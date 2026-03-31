@@ -35,12 +35,14 @@ class DataFeed:
         Finnhub delivers real OANDA trade data — proper OHLC candles.
         """
         ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+        backoff = 5  # seconds — doubles on each 429, resets on success
 
         while self.running:
             try:
                 async with aiohttp.ClientSession() as session:
                     async with session.ws_connect(WS_URL, ssl=ssl_ctx) as ws:
                         print("[FEED] ✅ Finnhub WebSocket connected! Subscribing to XAU/USD...")
+                        backoff = 5   # reset on successful connect
 
                         await ws.send_json({"type": "subscribe", "symbol": SYMBOL})
 
@@ -72,12 +74,19 @@ class DataFeed:
                                 break
 
             except Exception as e:
-                print(f"[FEED] WebSocket error: {e}. Falling back to REST for 30s...")
-                await asyncio.sleep(30)
+                if "429" in str(e):
+                    backoff = min(backoff * 2, 60)  # exponential backoff, max 60s
+                    print(f"[FEED] ⚠️  Rate limited (429) — backing off {backoff}s...")
+                else:
+                    print(f"[FEED] WebSocket error: {e}. Falling back to REST for 30s...")
+                    backoff = 30
+                await asyncio.sleep(backoff)
+                continue
 
             if self.running:
-                print("[FEED] Reconnecting WebSocket in 5s...")
-                await asyncio.sleep(5)
+                print(f"[FEED] Reconnecting WebSocket in {backoff}s...")
+                await asyncio.sleep(backoff)
+
 
     async def _run_accelerator(self):
         """
