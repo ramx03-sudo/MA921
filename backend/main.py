@@ -132,8 +132,22 @@ async def process_tick(bid: float, ask: float, ts: int):
 
             # 4️⃣ Re-broadcast corrected snapshot to all connected clients
             await broadcast_queue.put({"event": "SNAPSHOT", "data": chart_snapshot_buffer})
+
+            # 5️⃣ ARM ENTRY: join any trend that was already running before server started
+            if strategy_active:
+                arm_signal = strategy.should_enter_now()
+                if arm_signal:
+                    print(f"  🚀 [ARM] Joining existing trend — executing {arm_signal} @ {mid:.2f}")
+                    await execution.execute_trade(arm_signal, mid, "XAUUSD")
         else:
             print(f"[CALIBRATE] Gap is {computed_offset:+.2f} — no shift needed")
+            # Even with no basis shift, check if we should enter based on current MA state
+            if strategy_active:
+                arm_signal = strategy.should_enter_now()
+                if arm_signal:
+                    print(f"  🚀 [ARM] Joining existing trend — executing {arm_signal} @ {mid:.2f}")
+                    await execution.execute_trade(arm_signal, mid, "XAUUSD")
+
 
     pos_str = str(portfolio.position.value if hasattr(portfolio.position, 'value') else portfolio.position) if portfolio.position else None
     liq = bid if pos_str == "LONG" else ask if pos_str == "SHORT" else mid

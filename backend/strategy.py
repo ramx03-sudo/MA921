@@ -24,6 +24,33 @@ class GoldStrategy:
         self.position    = None   # "long" | "short" | None
         self.entry_price = 0.0
 
+    def should_enter_now(self) -> str | None:
+        """
+        Called on startup/arm to join an already-established trend.
+        Does NOT require a fresh crossover — checks current MA alignment.
+        Returns 'BUY', 'SELL', or None.
+        """
+        if len(self.prices) < 201 or self.position is not None:
+            return None
+
+        close = pd.Series(self.prices)
+        m9   = close.rolling(9).mean().iloc[-1]
+        m21  = close.rolling(21).mean().iloc[-1]
+        m50  = close.rolling(50).mean().iloc[-1]
+        m200 = close.rolling(200).mean().iloc[-1]
+
+        if m50 > m200 and m9 > m21:   # bullish trend + MA9 above MA21
+            self.position    = "long"
+            self.entry_price = round(self.prices[-1], 2)
+            print(f"  [STRATEGY] ARM ENTRY LONG  @ {self.entry_price:.2f} | MA9({m9:.2f})>MA21({m21:.2f}) | MA50>MA200")
+            return "BUY"
+        elif m50 < m200 and m9 < m21: # bearish trend + MA9 below MA21
+            self.position    = "short"
+            self.entry_price = round(self.prices[-1], 2)
+            print(f"  [STRATEGY] ARM ENTRY SHORT @ {self.entry_price:.2f} | MA9({m9:.2f})<MA21({m21:.2f}) | MA50<MA200")
+            return "SELL"
+        return None
+
     def update(self, price, high=None, low=None, emit_signal=True):
         price = round(float(price), 2)
         high  = round(float(high) if high else price, 2)
