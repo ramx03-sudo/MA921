@@ -2,6 +2,7 @@ import json
 import os
 import time
 import datetime
+import requests
 import yfinance as yf
 
 CACHE_FILE = "warmup_cache.json"
@@ -14,6 +15,9 @@ VISIBLE_BARS = 4795
 CACHE_MAX_AGE_SECS = 900
 # Re-fetch if last candle in cache is older than this (seconds) — closes the gap at startup
 CANDLE_STALE_SECS = 600  # 10 minutes
+
+FINNHUB_API_KEY = "d73p9fpr01qjjol3rhp0d73p9fpr01qjjol3rhpg"
+FINNHUB_CANDLE_URL = "https://finnhub.io/api/v1/stock/candle"
 
 # yfinance interval mapping
 # yfinance intervals: 1m, 5m, 15m, 60m (1h not supported directly → use 60m)
@@ -101,6 +105,59 @@ def _fetch_yfinance_candles(interval: str) -> dict | None:
         print(f"[WARMUP] ⚠️  yfinance fetch failed: {e}")
         return None
 
+def _fill_gap_with_finnhub(data: dict) -> dict:
+    """
+    After loading yfinance data, fetch any missing 1-minute candles between
+    the last yfinance candle and now from Finnhub REST API.
+    This closes the visual gap on the chart caused by yfinance data delay.
+    """
+    if not data or "t" not in data or not data["t"]:
+        return data
+
+    last_ts = int(data["t"][-1])
+    now_ts  = int(time.time())
+    gap_minutes = (now_ts - last_ts) // 60
+
+    if gap_minutes < 2:
+        print(f"[GAP-FILL] No gap to fill ({gap_minutes}m) — data is current.")
+        return data
+
+    print(f"[GAP-FILL] Fetching {gap_minutes} missing candles from Finnhub (gap: {gap_minutes}m)...")
+
+    try:
+        # Finnhub stock/candle uses OANDA:XAU_USD symbol for spot gold
+        resp = requests.get(
+            FINNHUB_CANDLE_URL,
+            params={
+                "symbol":     "OANDA:XAU_USD",
+                "resolution": "1",
+                "from":       last_ts + 60,   # start 1 candle after last known
+                "to":         now_ts,
+                "token":      FINNHUB_API_KEY,
+            },
+            timeout=10
+        )
+        gap_data = resp.json()
+
+        if gap_data.get("s") != "ok" or not gap_data.get("t"):
+            print(f"[GAP-FILL] Finnhub returned no candles (status={gap_data.get('s')}) — gap remains.")
+            return data
+
+        n = len(gap_data["t"])
+        print(f"[GAP-FILL] ✅ Filled {n} candles from Finnhub.")
+
+        # Append gap candles to existing data
+        data["t"] += [int(ts) for ts in gap_data["t"]]
+        data["o"] += [round(float(v), 4) for v in gap_data["o"]]
+        data["h"] += [round(float(v), 4) for v in gap_data["h"]]
+        data["l"] += [round(float(v), 4) for v in gap_data["l"]]
+        data["c"] += [round(float(v), 4) for v in gap_data["c"]]
+
+    except Exception as e:
+        print(f"[GAP-FILL] ⚠️  Finnhub gap-fill failed: {e} — gap remains.")
+
+    return data
+
 
 def _parse_candles(data: dict, strategy, visible: int) -> list:
     """
@@ -174,8 +231,13 @@ def load_historical(strategy, visible: int = VISIBLE_BARS) -> list:
     if data is None:
         data = _fetch_yfinance_candles("1min")
         if data:
+            # Fill the gap between last yfinance candle and now
+            data = _fill_gap_with_finnhub(data)
             with open(CACHE_FILE, "w") as f:
                 json.dump(data, f)
+    else:
+        # Even with fresh cache, top up with any new candles since cache was written
+        data = _fill_gap_with_finnhub(data)
 
     # ── 3. Stale cache fallback ───────────────────────────────────────────────
     if data is None and os.path.exists(CACHE_FILE):
